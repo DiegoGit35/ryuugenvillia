@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:ryuugenvillia/domain/entities/libro.dart';
+import 'package:ryuugenvillia/domain/usecases/get_libros.dart';
 import 'constantes_globales.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
   runApp(const MyApp());
 }
 
@@ -30,33 +35,93 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  GetLibros useCaseGetLibros = GetLibros();
+  late Future<List<Libro>> lista = useCaseGetLibros.getLibrosActivos();
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          bottom: TabBar(
-            tabs: <Widget>[
-              Tab(icon: Icon(Icons.book, size: 20,), text: "Libros", height: 50,),
-              Tab(icon: Icon(Icons.tips_and_updates, size: 20,), text: "Examen", height: 50,),
-            ],
-          ),
-          title: Text(widget.title),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.title,
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Color.from(alpha: 1, red: 1, green: 1, blue: 1),
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {},
-          tooltip: 'Increment',
-          child: const Icon(Icons.add),
-        ),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        centerTitle: true,
+      ),
+      body: FutureBuilder(
+        future: lista,
+        builder: (BuildContext context, AsyncSnapshot<List<Libro>> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Mostrar un indicador de carga mientras se espera la respuesta
+            return const SizedBox(
+              width: 300,
+              height: 300,
+              child: CircularProgressIndicator(),
+            );
+          } else if (snapshot.hasError) {
+            return Text("Error: ${snapshot.error}");
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Text("No hay libros disponibles.");
+          } else {
+            List<Libro> libros = snapshot.data!;
+            return Container(
+              width: MediaQuery.of(context).size.width,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: libros.length,
+                itemBuilder: (BuildContext context, int index) {
+                  Libro unLibro = libros[index];
+
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: LibroItem(unLibro, context),
+                    ),
+                  );
+                },
+              ),
+            );
+          }
+        },
       ),
     );
   }
+}
+
+SizedBox LibroItem(Libro unLibro, context) {
+  return SizedBox(
+    width: 300,
+    child: ElevatedButton(
+      onPressed: () {
+        // Navigator.push(
+        //     context,
+        //     MaterialPageRoute(
+        //         builder: (context) => PagePreguntas(unLibro: unlibro)));
+      },
+      style: ElevatedButton.styleFrom(
+        shape: ContinuousRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        backgroundColor: Colors.white,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        child: Center(
+          child: Column(
+            children: [
+              SizedBox(
+                child: Column(
+                  children: [Text(unLibro.nombre, style: TextStyle())],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
