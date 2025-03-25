@@ -1,33 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:ryuugenvillia/domain/entities/libro.dart';
-import 'package:ryuugenvillia/domain/usecases/get_libros.dart';
-import 'constantes_globales.dart';
+import 'package:ryuugenvillia/presentation/blocs/lista_de_libros_bloc.dart';
+import 'configuraciones_globales.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+    return MultiProvider(
+      providers: [
+        BlocProvider(create: (context) => LibroBloc(AppConstants.REPOSITORIO)),
+        // Agrega otros Blocs aquí
+      ],
+      child: MaterialApp(
+        title: 'Libros App',
+        home: MyHomePage(title: AppConstants.NOMBRE_DE_LA_APLICACION),
       ),
-      home: MyHomePage(title: AppConstants.NOMBRE_DE_LA_APLICACION),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
   final String title;
 
   @override
@@ -35,8 +37,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  GetLibros useCaseGetLibros = GetLibros();
-  late Future<List<Libro>> lista = useCaseGetLibros.getLibrosActivos();
+  @override
+  void initState() {
+    super.initState();
+    context.read<LibroBloc>().add(LoadLibros());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,53 +52,49 @@ class _MyHomePageState extends State<MyHomePage> {
           style: TextStyle(
             fontSize: 25,
             fontWeight: FontWeight.bold,
-            color: Color.from(alpha: 1, red: 1, green: 1, blue: 1),
+            color: Colors.white,
           ),
         ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
       ),
-      body: FutureBuilder(
-        future: lista,
-        builder: (BuildContext context, AsyncSnapshot<List<Libro>> snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            // Mostrar un indicador de carga mientras se espera la respuesta
-            return const SizedBox(
-              width: 300,
-              height: 300,
-              child: CircularProgressIndicator(),
-            );
-          } else if (snapshot.hasError) {
-            return Text("Error: ${snapshot.error}");
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Text("No hay libros disponibles.");
-          } else {
-            List<Libro> libros = snapshot.data!;
+      body: BlocBuilder<LibroBloc, LibroState>(
+        builder: (context, state) {
+          if (state is LibroLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is LibroLoaded) {
             return Container(
               width: MediaQuery.of(context).size.width,
               child: ListView.builder(
                 shrinkWrap: true,
-                itemCount: libros.length,
-                itemBuilder: (BuildContext context, int index) {
-                  Libro unLibro = libros[index];
-
+                itemCount: state.libros.length,
+                itemBuilder: (context, index) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(5),
-                      child: LibroItem(unLibro, context),
+                      child: LibroItem(state.libros[index], context),
                     ),
                   );
                 },
               ),
             );
+          } else if (state is LibroError) {
+            return Center(child: Text("Error: ${state.message}"));
+          } else {
+            return const Center(child: Text("No hay libros disponibles."));
           }
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => agregarLibro(context, context.read<LibroBloc>()),
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
 SizedBox LibroItem(Libro unLibro, context) {
+  print("el nombre es ${unLibro.nombre}");
   return SizedBox(
     width: 300,
     child: ElevatedButton(
@@ -123,5 +125,48 @@ SizedBox LibroItem(Libro unLibro, context) {
         ),
       ),
     ),
+  );
+}
+
+void agregarLibro(BuildContext context, LibroBloc bloc) {
+  // final paginaController = TextEditingController();
+  final nombreController = TextEditingController();
+  showDialog(
+    context: context,
+    builder:
+        (context) => AlertDialog(
+          title: const Text('Agregar un libro'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombreController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del libro',
+                ),
+              ),
+              // TextField(
+              //   controller: paginaController,
+              //   decoration: const InputDecoration(labelText: 'pagina de la pregunta'),
+              //   keyboardType: TextInputType.number,
+              // ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                final nombre = nombreController.text;
+                final libro = Libro(nombre: nombre);
+                bloc.add(AddLibro(libro));
+                Navigator.pop(context);
+              },
+              child: const Text('Agregar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        ),
   );
 }
