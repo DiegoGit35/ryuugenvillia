@@ -18,7 +18,6 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         BlocProvider(create: (context) => LibroBloc(AppConstants.REPOSITORIO)),
-        // Agrega otros Blocs aquí
       ],
       child: MaterialApp(
         title: 'Libros App',
@@ -37,6 +36,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  Libro? libroSeleccionado;
+
   @override
   void initState() {
     super.initState();
@@ -45,83 +46,100 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          libroSeleccionado = null;
+        });
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.title,
+            style: const TextStyle(
+              fontSize: 25,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          centerTitle: true,
+          actions:
+              libroSeleccionado != null
+                  ? [
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.white),
+                      onPressed: () {
+                        if (libroSeleccionado != null) {
+                          context.read<LibroBloc>().add(
+                            DeleteLibro(libroSeleccionado!),
+                          );
+                          setState(() => libroSeleccionado = null);
+                        }
+                      },
+                    ),
+                  ]
+                  : [],
         ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        centerTitle: true,
-      ),
-      body: BlocBuilder<LibroBloc, LibroState>(
-        builder: (context, state) {
-          if (state is LibroLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is LibroLoaded) {
-            return Container(
-              width: MediaQuery.of(context).size.width,
-              child: ListView.builder(
-                shrinkWrap: true,
+        body: BlocBuilder<LibroBloc, LibroState>(
+          builder: (context, state) {
+            if (state is LibroLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (state is LibroLoaded) {
+              return ListView.builder(
                 itemCount: state.libros.length,
                 itemBuilder: (context, index) {
+                  final libro = state.libros[index];
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(5),
-                      child: LibroItem(state.libros[index], context),
+                      child: LibroItem(libro, context, (libro) {
+                        setState(() {
+                          libroSeleccionado = libro;
+                        });
+                      }),
                     ),
                   );
                 },
-              ),
-            );
-          } else if (state is LibroError) {
-            return Center(child: Text("Error: ${state.message}"));
-          } else {
-            return const Center(child: Text("No hay libros disponibles."));
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => agregarLibro(context, context.read<LibroBloc>()),
-        child: const Icon(Icons.add),
+              );
+            } else if (state is LibroError) {
+              return Center(child: Text("Error: ${state.message}"));
+            } else {
+              return const Center(child: Text("No hay libros disponibles."));
+            }
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => agregarLibro(context, context.read<LibroBloc>()),
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
 }
 
-SizedBox LibroItem(Libro unLibro, context) {
-  print("el nombre es ${unLibro.nombre}");
+SizedBox LibroItem(
+  Libro unLibro,
+  BuildContext context,
+  Function(Libro) onLongPress,
+) {
   return SizedBox(
     width: 300,
-    child: ElevatedButton(
-      onPressed: () {
-        // Navigator.push(
-        //     context,
-        //     MaterialPageRoute(
-        //         builder: (context) => PagePreguntas(unLibro: unlibro)));
+    child: GestureDetector(
+      onLongPress: () {
+        onLongPress(unLibro);
       },
-      style: ElevatedButton.styleFrom(
-        shape: ContinuousRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        backgroundColor: Colors.white,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        child: Center(
-          child: Column(
-            children: [
-              SizedBox(
-                child: Column(
-                  children: [Text(unLibro.nombre, style: TextStyle())],
-                ),
-              ),
-            ],
+      child: ElevatedButton(
+        onPressed: () {},
+        style: ElevatedButton.styleFrom(
+          shape: ContinuousRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
+          backgroundColor: Colors.white,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Center(child: Text(unLibro.nombre)),
         ),
       ),
     ),
@@ -129,7 +147,6 @@ SizedBox LibroItem(Libro unLibro, context) {
 }
 
 void agregarLibro(BuildContext context, LibroBloc bloc) {
-  // final paginaController = TextEditingController();
   final nombreController = TextEditingController();
   showDialog(
     context: context,
@@ -145,6 +162,7 @@ void agregarLibro(BuildContext context, LibroBloc bloc) {
                   labelText: 'Nombre del libro',
                 ),
               ),
+
               // TextField(
               //   controller: paginaController,
               //   decoration: const InputDecoration(labelText: 'pagina de la pregunta'),

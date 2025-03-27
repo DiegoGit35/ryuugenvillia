@@ -1,5 +1,6 @@
-
 // Eventos del Bloc
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -18,6 +19,14 @@ class LoadLibros extends LibroEvent {}
 class AddLibro extends LibroEvent {
   final Libro libro;
   AddLibro(this.libro);
+
+  @override
+  List<Object?> get props => [libro];
+}
+
+class DeleteLibro extends LibroEvent {
+  final Libro libro;
+  DeleteLibro(this.libro);
 
   @override
   List<Object?> get props => [libro];
@@ -59,6 +68,7 @@ class LibroBloc extends Bloc<LibroEvent, LibroState> {
   LibroBloc(this.repositorio) : super(LibroInitial()) {
     on<LoadLibros>(_onLoadLibros);
     on<AddLibro>(_onAddLibro);
+    on<DeleteLibro>(_onDeleteLibro);
   }
 
   Future<void> _onLoadLibros(LoadLibros event, Emitter<LibroState> emit) async {
@@ -74,6 +84,19 @@ class LibroBloc extends Bloc<LibroEvent, LibroState> {
   Future<void> _onAddLibro(AddLibro event, Emitter<LibroState> emit) async {
     try {
       await repositorio.addLibro(event.libro);
+      final libros = await repositorio.todosLosLibros();
+      emit(LibroLoaded(libros));
+    } catch (e) {
+      emit(LibroError(e.toString()));
+    }
+  }
+
+  FutureOr<void> _onDeleteLibro(
+    DeleteLibro event,
+    Emitter<LibroState> emit,
+  ) async {
+    try {
+      repositorio.bajarLibro(event.libro.idLibro!);
       final libros = await repositorio.todosLosLibros();
       emit(LibroLoaded(libros));
     } catch (e) {
